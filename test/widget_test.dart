@@ -7,7 +7,7 @@ void main() {
   testWidgets('Placeholder home screen renders correctly', (tester) async {
     await tester.pumpWidget(
       const ProviderScope(
-        child: SmartSwitchApp(),
+        child: SmartSwitchApp(usePlaceholder: true),
       ),
     );
 
