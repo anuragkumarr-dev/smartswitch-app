@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme.dart';
+import 'features/onboarding/presentation/debug_provisioning_screen.dart';
+import 'features/onboarding/presentation/qr_scan_screen.dart';
 
 void main() {
   runApp(
@@ -66,6 +68,30 @@ class PlaceholderHomeScreen extends StatelessWidget {
               style: textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
+            ),
+            const SizedBox(height: Spacing.lg),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.build),
+              label: const Text('Provisioning Debug Tool'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const DebugProvisioningScreen(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: Spacing.sm),
+            OutlinedButton.icon(
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scan Switch QR'),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const QrScanScreen(),
+                  ),
+                );
+              },
             ),
           ],
         ),

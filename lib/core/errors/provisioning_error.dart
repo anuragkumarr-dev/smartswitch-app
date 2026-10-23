@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 
 /// Blueprint §2.4 failure taxonomy and error types for smart switch provisioning.
 enum ProvisioningFailureType {
-  /// Scanned QR code format does not match SW1:<productId>:<deviceId>:<PoP>.
+  /// Scanned QR code format does not match `SW1:<productId>:<deviceId>:<PoP>`.
   invalidQr,
 
   /// Required permissions (Camera or Bluetooth/Location) were denied by the user.
