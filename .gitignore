@@ -53,3 +53,5 @@ GoogleService-Info.plist
 
 # Flutter plugin registration (auto-generated)
 .flutter-plugins
+.kotlin/
+devtools_options.yaml

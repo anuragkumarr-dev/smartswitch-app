@@ -28,8 +28,8 @@ lib/
 | Phase | Description | Status |
 |-------|-------------|--------|
 | 0. Foundations | Repo, CI, design tokens, folder layout | ✅ Done |
-| 1. BLE provisioning engine | QR scan, BLE session, config push, status stream | ⬜ Not started |
-| 2. Local & cloud comms | mDNS, WebSocket, MQTT, CommandRouter | ⬜ Not started |
+| 1. BLE provisioning engine | QR scan, BLE session, config push, status stream | ✅ Done |
+| 2. Local & cloud comms | mDNS, WebSocket, MQTT, CommandRouter | ✅ Done |
 | 3. State & models | Domain models, Riverpod providers, local DB, shadow sync | ⬜ Not started |
 | 4. Production UI | Home, control, schedules, mesh diagnostics, onboarding | ⬜ Not started |
 | 5. Security, auth, cloud sync | Login, roles, tokens, ACLs, OTA, push | ⬜ Not started |
