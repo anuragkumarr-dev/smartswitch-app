@@ -30,7 +30,9 @@ class DeviceRepository {
     for (final dev in cached) {
       _devicesCache[dev.deviceId] = dev;
     }
-    _devicesController.add(Map.from(_devicesCache));
+    if (!_devicesController.isClosed) {
+      _devicesController.add(Map.from(_devicesCache));
+    }
     return cached;
   }
 
@@ -68,7 +70,9 @@ class DeviceRepository {
 
     // Persist reconciled state into local DB
     await localDatabase.saveDevices(reconciled);
-    _devicesController.add(Map.from(_devicesCache));
+    if (!_devicesController.isClosed) {
+      _devicesController.add(Map.from(_devicesCache));
+    }
     return reconciled;
   }
 
@@ -105,7 +109,9 @@ class DeviceRepository {
     await localDatabase.saveShadow(deviceId, updatedShadow);
     await localDatabase.saveDevices([updatedDevice]);
 
-    _devicesController.add(Map.from(_devicesCache));
+    if (!_devicesController.isClosed) {
+      _devicesController.add(Map.from(_devicesCache));
+    }
     return true;
   }
 
@@ -124,7 +130,9 @@ class DeviceRepository {
     await localDatabase.saveShadow(deviceId, shadow);
     await localDatabase.saveDevices([updatedDevice]);
 
-    _devicesController.add(Map.from(_devicesCache));
+    if (!_devicesController.isClosed) {
+      _devicesController.add(Map.from(_devicesCache));
+    }
   }
 
   /// Helper to synchronize Gang isOn properties with shadow reported values.

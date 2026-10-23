@@ -152,12 +152,12 @@ class DevicesNotifier extends Notifier<DevicesState> {
 
   /// Step 3 (Blueprint §3.2): Confirm state upon receiving an ACK or state report
   /// with matching commandId. Clears pending state and commits reported state.
-  void confirm({
+  Future<void> confirm({
     required String deviceId,
     required String commandId,
     required int ver,
     required Map<String, dynamic> reported,
-  }) {
+  }) async {
     final current = state[deviceId];
     if (current == null) return;
 
@@ -197,7 +197,7 @@ class DevicesNotifier extends Notifier<DevicesState> {
     );
 
     state = Map<String, DeviceUiState>.from(state)..[deviceId] = updatedItem;
-    _repository?.updateDeviceShadow(deviceId, updatedShadow);
+    await _repository?.updateDeviceShadow(deviceId, updatedShadow);
   }
 
   /// Step 4 (Blueprint §3.2): Rollback optimistic state to last confirmed state
@@ -305,7 +305,7 @@ class DevicesNotifier extends Notifier<DevicesState> {
           {
             gangId: {'on': desiredIsOn},
           };
-      confirm(
+      await confirm(
         deviceId: deviceId,
         commandId: commandId,
         ver: ack.ver ?? (current.shadow.ver + 1),

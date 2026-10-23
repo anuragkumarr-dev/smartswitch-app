@@ -10,7 +10,6 @@ import 'package:smartswitch_app/transport/command_router.dart';
 import 'package:smartswitch_app/transport/local_transport.dart';
 import 'package:smartswitch_app/transport/mdns_service.dart';
 import 'package:smartswitch_app/transport/models/command_result.dart';
-import 'package:smartswitch_app/transport/models/message_envelope.dart';
 
 void main() {
   group('DevicesState & Optimistic UI (Blueprint §3.2 & §3.6)', () {
@@ -80,7 +79,7 @@ void main() {
           reason: 'Effective state must switch to desired immediately without waiting for network');
     });
 
-    test('Confirmation clears pending state and commits reported state with new ver', () {
+    test('Confirmation clears pending state and commits reported state with new ver', () async {
       notifier.markPending(
         deviceId: 'dev_living',
         gangId: 'gang1',
@@ -89,7 +88,7 @@ void main() {
       );
 
       // Confirm arrives from Root with ver 101
-      notifier.confirm(
+      await notifier.confirm(
         deviceId: 'dev_living',
         commandId: 'c_tap_2',
         ver: 101,
@@ -160,7 +159,7 @@ void main() {
 
       // Device Root processes Phone A's command first (ver 101: ON)
       final reportA = {'gang1': {'on': true}};
-      notifierA.confirm(
+      await notifierA.confirm(
         deviceId: 'dev_living',
         commandId: 'cmd_phone_A',
         ver: 101,
@@ -175,7 +174,7 @@ void main() {
 
       // Device Root then processes Phone B's command (ver 102: OFF)
       final reportB = {'gang1': {'on': false}};
-      notifierB.confirm(
+      await notifierB.confirm(
         deviceId: 'dev_living',
         commandId: 'cmd_phone_B',
         ver: 102,

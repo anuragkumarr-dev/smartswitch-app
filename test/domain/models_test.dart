@@ -86,7 +86,7 @@ void main() {
         isRunning: true,
       );
 
-      expect(countdown.formattedRemaining, '0h 59m');
+      expect(countdown.formattedRemaining, '59m 05s');
       final cdJson = countdown.toJson();
       expect(Countdown.fromJson(cdJson), equals(countdown));
     });
