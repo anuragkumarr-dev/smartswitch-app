@@ -5,7 +5,6 @@ import '../data/device_repository.dart';
 import '../domain/models/models.dart';
 import '../transport/command_router.dart';
 import '../transport/models/command_result.dart';
-import '../transport/models/message_envelope.dart';
 
 /// Presentation state for a single device, combining confirmed shadow state
 /// with optimistic in-flight pending updates (Blueprint §3.2).
@@ -288,23 +287,20 @@ class DevicesNotifier extends Notifier<DevicesState> {
       commandId: commandId,
     );
 
-    final envelope = MessageEnvelope.command(
+    // 2. Dispatch via CommandRouter (local-first with cloud fallback)
+    final result = await router.sendCommand(
+      homeId: current.device.homeId,
+      gatewayId: current.device.gatewayId,
       deviceId: deviceId,
-      commandId: commandId,
       desired: {
         gangId: {'on': desiredIsOn},
       },
-    );
-
-    // 2. Dispatch via CommandRouter (local-first with cloud fallback)
-    final result = await router.send(
-      gatewayId: current.device.gatewayId,
-      envelope: envelope,
+      commandId: commandId,
     );
 
     // 3. Confirm or Rollback
-    if (result.isSuccess && result.ackEnvelope != null) {
-      final ack = result.ackEnvelope!;
+    if (result.isSuccess && result.ack != null) {
+      final ack = result.ack!;
       final reported = ack.reported ??
           {
             gangId: {'on': desiredIsOn},
@@ -315,14 +311,14 @@ class DevicesNotifier extends Notifier<DevicesState> {
         ver: ack.ver ?? (current.shadow.ver + 1),
         reported: reported,
       );
-      return result.result;
+      return result.status;
     } else {
       rollback(
         deviceId: deviceId,
         commandId: commandId,
-        errorMessage: result.error ?? 'Command failed',
+        errorMessage: result.errorMessage ?? 'Command failed',
       );
-      return result.result;
+      return result.status;
     }
   }
 
