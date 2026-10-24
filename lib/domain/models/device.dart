@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'device_capabilities.dart';
 import 'gang.dart';
 import 'shadow.dart';
 
@@ -15,6 +16,7 @@ class Device {
   final String fwVersion;
   final String gatewayId; // Current Root switch routing gateway
   final Shadow shadow;
+  final DeviceCapabilities capabilities;
 
   const Device({
     required this.deviceId,
@@ -27,6 +29,7 @@ class Device {
     this.fwVersion = '1.0.0',
     required this.gatewayId,
     this.shadow = const Shadow(),
+    this.capabilities = DeviceCapabilities.full,
   });
 
   Device copyWith({
@@ -40,6 +43,7 @@ class Device {
     String? fwVersion,
     String? gatewayId,
     Shadow? shadow,
+    DeviceCapabilities? capabilities,
   }) {
     return Device(
       deviceId: deviceId ?? this.deviceId,
@@ -52,6 +56,7 @@ class Device {
       fwVersion: fwVersion ?? this.fwVersion,
       gatewayId: gatewayId ?? this.gatewayId,
       shadow: shadow ?? this.shadow,
+      capabilities: capabilities ?? this.capabilities,
     );
   }
 
@@ -73,6 +78,7 @@ class Device {
       'fwVersion': fwVersion,
       'gatewayId': gatewayId,
       'shadow': shadow.toJson(),
+      'capabilities': capabilities.toJson(),
     };
   }
 
@@ -83,6 +89,7 @@ class Device {
         [];
 
     final shadowJson = json['shadow'] as Map<String, dynamic>?;
+    final capJson = json['capabilities'] as Map<String, dynamic>?;
 
     return Device(
       deviceId: json['deviceId'] as String,
@@ -95,6 +102,9 @@ class Device {
       fwVersion: (json['fwVersion'] as String?) ?? '1.0.0',
       gatewayId: json['gatewayId'] as String,
       shadow: shadowJson != null ? Shadow.fromJson(shadowJson) : const Shadow(),
+      capabilities: capJson != null
+          ? DeviceCapabilities.fromJson(capJson)
+          : DeviceCapabilities.full,
     );
   }
 
@@ -112,7 +122,8 @@ class Device {
           listEquals(gangs, other.gangs) &&
           fwVersion == other.fwVersion &&
           gatewayId == other.gatewayId &&
-          shadow == other.shadow;
+          shadow == other.shadow &&
+          capabilities == other.capabilities;
 
   @override
   int get hashCode => Object.hash(
@@ -126,6 +137,7 @@ class Device {
         fwVersion,
         gatewayId,
         shadow,
+        capabilities,
       );
 
   @override

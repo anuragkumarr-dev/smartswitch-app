@@ -101,6 +101,31 @@ class MeshTopologyNotifier extends Notifier<MeshTopologyState> {
     state = state.copyWith(isRefreshing: refreshing);
   }
 
+  /// Sets nodes directly with optional root gateway ID override
+  void setNodes({
+    required List<MeshNode> nodes,
+    String? rootGatewayId,
+  }) {
+    final root = nodes.cast<MeshNode?>().firstWhere(
+          (n) => n?.role == MeshRole.root,
+          orElse: () => null,
+        );
+
+    final total = nodes.length;
+    final now = DateTime.now();
+    final online = nodes.where((n) => now.difference(n.lastSeen).inSeconds < 60).length;
+    final score = _computeHealthScore(nodes, online, total);
+
+    state = state.copyWith(
+      nodes: nodes,
+      rootGatewayId: rootGatewayId ?? root?.deviceId,
+      healthScore: score,
+      onlineCount: online,
+      totalCount: total,
+      isRefreshing: false,
+    );
+  }
+
   void updateTopology(List<MeshNode> nodes) {
     final root = nodes.cast<MeshNode?>().firstWhere(
           (n) => n?.role == MeshRole.root,

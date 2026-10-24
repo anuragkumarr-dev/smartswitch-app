@@ -43,6 +43,13 @@ class _DeviceControlScreenState extends ConsumerState<DeviceControlScreen>
   // Schedules state
   final List<Schedule> _schedules = [];
 
+  int _calculateTabCount(Device dev) {
+    int count = 1; // Settings tab always present
+    if (dev.capabilities.supportsCountdown) count++;
+    if (dev.capabilities.supportsSchedules) count++;
+    return count;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -105,6 +112,12 @@ class _DeviceControlScreenState extends ConsumerState<DeviceControlScreen>
           ],
         );
 
+    final tabCount = _calculateTabCount(dev);
+    if (_tabController.length != tabCount) {
+      _tabController.dispose();
+      _tabController = TabController(length: tabCount, vsync: this);
+    }
+
     final primaryGang = dev.gangs.isNotEmpty ? dev.gangs.first : null;
     final primaryGangId = primaryGang?.gangId ?? 'gang1';
     final isMasterOn = uiState != null
@@ -132,7 +145,7 @@ class _DeviceControlScreenState extends ConsumerState<DeviceControlScreen>
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert_rounded),
-            onPressed: () => _tabController.animateTo(2), // jump to settings
+            onPressed: () => _tabController.animateTo(tabCount - 1), // jump to settings
           ),
         ],
       ),
@@ -191,32 +204,41 @@ class _DeviceControlScreenState extends ConsumerState<DeviceControlScreen>
               const SizedBox(height: Spacing.md),
             ],
 
-            // 4. Tab Bar (Countdown, Schedule, Settings)
-            TabBar(
-              controller: _tabController,
-              indicatorColor: AppColors.accent,
-              labelColor: AppColors.accent,
-              unselectedLabelColor: isDark
-                  ? AppColors.darkOnSurfaceVariant
-                  : AppColors.lightOnSurfaceVariant,
-              tabs: const [
-                Tab(text: 'Countdown'),
-                Tab(text: 'Schedules'),
-                Tab(text: 'Settings'),
-              ],
-            ),
-
-            // 5. Tab Views
-            Expanded(
-              child: TabBarView(
+            // 4. Tab Bar (Countdown, Schedule, Settings) - Hidden if device capabilities do not support them
+            if (dev.capabilities.supportsCountdown ||
+                dev.capabilities.supportsSchedules ||
+                dev.capabilities.supportsBacklight) ...[
+              TabBar(
                 controller: _tabController,
-                children: [
-                  _buildCountdownTab(context),
-                  _buildSchedulesTab(context),
-                  _buildSettingsTab(context, dev),
+                indicatorColor: AppColors.accent,
+                labelColor: AppColors.accent,
+                unselectedLabelColor: isDark
+                    ? AppColors.darkOnSurfaceVariant
+                    : AppColors.lightOnSurfaceVariant,
+                tabs: [
+                  if (dev.capabilities.supportsCountdown) const Tab(text: 'Countdown'),
+                  if (dev.capabilities.supportsSchedules) const Tab(text: 'Schedules'),
+                  const Tab(text: 'Settings'),
                 ],
               ),
-            ),
+
+              // 5. Tab Views
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    if (dev.capabilities.supportsCountdown) _buildCountdownTab(context),
+                    if (dev.capabilities.supportsSchedules) _buildSchedulesTab(context),
+                    _buildSettingsTab(context, dev),
+                  ],
+                ),
+              ),
+            ] else ...[
+              // Basic on/off device: simple settings view without advanced tabs
+              Expanded(
+                child: _buildSettingsTab(context, dev),
+              ),
+            ],
           ],
         ),
       ),
@@ -661,79 +683,83 @@ class _DeviceControlScreenState extends ConsumerState<DeviceControlScreen>
     return ListView(
       padding: const EdgeInsets.all(Spacing.screenMargin),
       children: [
-        Text('Backlight & LED Indicator', style: theme.textTheme.titleMedium),
-        const SizedBox(height: Spacing.xs),
-        Wrap(
-          spacing: 8,
-          children: ['off', 'dim', 'bright', 'auto'].map((mode) {
-            return ChoiceChip(
-              label: Text(mode.toUpperCase()),
-              selected: _backlightMode == mode,
-              selectedColor: AppColors.accent,
-              onSelected: (_) => setState(() => _backlightMode = mode),
-            );
-          }).toList(),
-        ),
-        if (_backlightMode != 'off') ...[
-          const SizedBox(height: Spacing.sm),
-          Row(
-            children: [
-              const Icon(Icons.brightness_6_rounded, size: 20),
-              Expanded(
-                child: Slider(
-                  value: _backlightBrightness,
-                  min: 0,
-                  max: 100,
-                  divisions: 10,
-                  activeColor: AppColors.accent,
-                  label: '${_backlightBrightness.round()}%',
-                  onChanged: (v) => setState(() => _backlightBrightness = v),
-                ),
-              ),
-            ],
+        if (dev.capabilities.supportsBacklight) ...[
+          Text('Backlight & LED Indicator', style: theme.textTheme.titleMedium),
+          const SizedBox(height: Spacing.xs),
+          Wrap(
+            spacing: 8,
+            children: ['off', 'dim', 'bright', 'auto'].map((mode) {
+              return ChoiceChip(
+                label: Text(mode.toUpperCase()),
+                selected: _backlightMode == mode,
+                selectedColor: AppColors.accent,
+                onSelected: (_) => setState(() => _backlightMode = mode),
+              );
+            }).toList(),
           ),
+          if (_backlightMode != 'off') ...[
+            const SizedBox(height: Spacing.sm),
+            Row(
+              children: [
+                const Icon(Icons.brightness_6_rounded, size: 20),
+                Expanded(
+                  child: Slider(
+                    value: _backlightBrightness,
+                    min: 0,
+                    max: 100,
+                    divisions: 10,
+                    activeColor: AppColors.accent,
+                    label: '${_backlightBrightness.round()}%',
+                    onChanged: (v) => setState(() => _backlightBrightness = v),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const Divider(height: Spacing.xl),
         ],
 
-        const Divider(height: Spacing.xl),
+        if (dev.capabilities.supportsPowerOnBehaviour) ...[
+          Text('Indicator Behaviour', style: theme.textTheme.titleMedium),
+          DropdownButton<String>(
+            value: _indicatorBehaviour,
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(value: 'follow', child: Text('Follow relay (On when switch is ON)')),
+              DropdownMenuItem(value: 'inverse', child: Text('Inverse (On when switch is OFF)')),
+              DropdownMenuItem(value: 'always_on', child: Text('Always ON as night locator')),
+            ],
+            onChanged: (v) => setState(() => _indicatorBehaviour = v ?? 'follow'),
+          ),
 
-        Text('Indicator Behaviour', style: theme.textTheme.titleMedium),
-        DropdownButton<String>(
-          value: _indicatorBehaviour,
-          isExpanded: true,
-          items: const [
-            DropdownMenuItem(value: 'follow', child: Text('Follow relay (On when switch is ON)')),
-            DropdownMenuItem(value: 'inverse', child: Text('Inverse (On when switch is OFF)')),
-            DropdownMenuItem(value: 'always_on', child: Text('Always ON as night locator')),
-          ],
-          onChanged: (v) => setState(() => _indicatorBehaviour = v ?? 'follow'),
-        ),
+          const Divider(height: Spacing.xl),
 
-        const Divider(height: Spacing.xl),
+          Text('Power-On Behaviour', style: theme.textTheme.titleMedium),
+          DropdownButton<String>(
+            value: _powerOnBehaviour,
+            isExpanded: true,
+            items: const [
+              DropdownMenuItem(value: 'last_state', child: Text('Restore last state before power cut')),
+              DropdownMenuItem(value: 'off', child: Text('Default to OFF')),
+              DropdownMenuItem(value: 'on', child: Text('Default to ON')),
+            ],
+            onChanged: (v) => setState(() => _powerOnBehaviour = v ?? 'last_state'),
+          ),
 
-        Text('Power-On Behaviour', style: theme.textTheme.titleMedium),
-        DropdownButton<String>(
-          value: _powerOnBehaviour,
-          isExpanded: true,
-          items: const [
-            DropdownMenuItem(value: 'last_state', child: Text('Restore last state before power cut')),
-            DropdownMenuItem(value: 'off', child: Text('Default to OFF')),
-            DropdownMenuItem(value: 'on', child: Text('Default to ON')),
-          ],
-          onChanged: (v) => setState(() => _powerOnBehaviour = v ?? 'last_state'),
-        ),
+          const Divider(height: Spacing.xl),
+        ],
 
-        const Divider(height: Spacing.xl),
-
-        SwitchListTile(
-          title: const Text('Touch Lock (Child Lock)'),
-          subtitle: const Text('Disable physical touch buttons on the switch wall plate'),
-          value: _touchLock,
-          activeThumbColor: AppColors.accent,
-          contentPadding: EdgeInsets.zero,
-          onChanged: (v) => setState(() => _touchLock = v),
-        ),
-
-        const Divider(height: Spacing.xl),
+        if (dev.capabilities.supportsTouchLock) ...[
+          SwitchListTile(
+            title: const Text('Touch Lock (Child Lock)'),
+            subtitle: const Text('Disable physical touch buttons on the switch wall plate'),
+            value: _touchLock,
+            activeThumbColor: AppColors.accent,
+            contentPadding: EdgeInsets.zero,
+            onChanged: (v) => setState(() => _touchLock = v),
+          ),
+          const Divider(height: Spacing.xl),
+        ],
 
         ListTile(
           contentPadding: EdgeInsets.zero,

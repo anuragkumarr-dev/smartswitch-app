@@ -5,6 +5,8 @@ import '../../../core/theme.dart';
 import '../../../data/invite/invite_service.dart';
 import '../../../state/auth_state.dart';
 import '../../../state/homes_state.dart';
+import '../../../transport/blynk_bridge_controller.dart';
+import 'blynk_settings_sheet.dart';
 import 'create_invite_sheet.dart';
 
 final inviteServiceProvider = Provider<InviteService>((ref) => FakeInviteService());
@@ -30,6 +32,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final bioService = ref.read(biometricAuthServiceProvider);
     final enabled = await bioService.isAppLockEnabled();
     if (mounted) setState(() => _biometricEnabled = enabled);
+  }
+
+  void _openBlynkSettingsSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(Radii.cardLg)),
+      ),
+      builder: (_) => BlynkSettingsSheet(
+        secureStorage: ref.read(secureKeyStoreProvider),
+        transport: ref.read(blynkTransportProvider),
+      ),
+    );
   }
 
   void _openCreateInviteSheet(BuildContext context, AuthState authState) {
@@ -147,6 +163,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               subtitle: const Text('Roles, member invites, and home keys'),
               trailing: const Icon(Icons.chevron_right_rounded),
               onTap: () {},
+            ),
+            const Divider(),
+
+            // Prototype Connection: Blynk Bridge
+            ListTile(
+              leading: const Icon(Icons.hub_rounded, color: AppColors.accent),
+              title: const Text('Prototype connection (Blynk)'),
+              subtitle: const Text('ESP-NOW firmware bridge via Blynk Cloud V0..V16'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => _openBlynkSettingsSheet(context),
             ),
             const Divider(),
 

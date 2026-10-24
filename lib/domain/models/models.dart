@@ -1,5 +1,6 @@
 export 'countdown.dart';
 export 'device.dart';
+export 'device_capabilities.dart';
 export 'gang.dart';
 export 'home.dart';
 export 'home_invite.dart';

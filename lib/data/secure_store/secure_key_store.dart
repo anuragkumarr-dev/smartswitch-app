@@ -28,6 +28,15 @@ abstract interface class SecureKeyStore {
   Future<void> setBiometricsEnabled(bool enabled);
   Future<bool> isBiometricsEnabled();
 
+  // Blynk Prototype Configuration (Blueprint §5 & Blynk Bridge)
+  Future<void> saveBlynkConfig({
+    required String token,
+    required String region,
+  });
+  Future<String?> getBlynkToken();
+  Future<String?> getBlynkRegion();
+  Future<void> clearBlynkConfig();
+
   Future<void> clearAll();
 }
 
@@ -46,6 +55,8 @@ class FlutterSecureKeyStore implements SecureKeyStore {
   static const String _keyRefreshToken = 'auth_refresh_token';
   static const String _keyTokenExpiry = 'auth_token_expiry';
   static const String _keyBiometricsEnabled = 'setting_biometrics_enabled';
+  static const String _keyBlynkToken = 'blynk_auth_token';
+  static const String _keyBlynkRegion = 'blynk_region';
 
   String _homeKeyPrefix(String homeId) => 'home_key_$homeId';
   String _homeKeyIdPrefix(String homeId) => 'home_key_id_$homeId';
@@ -134,6 +145,27 @@ class FlutterSecureKeyStore implements SecureKeyStore {
   }
 
   @override
+  Future<void> saveBlynkConfig({
+    required String token,
+    required String region,
+  }) async {
+    await _storage.write(key: _keyBlynkToken, value: token);
+    await _storage.write(key: _keyBlynkRegion, value: region);
+  }
+
+  @override
+  Future<String?> getBlynkToken() => _storage.read(key: _keyBlynkToken);
+
+  @override
+  Future<String?> getBlynkRegion() => _storage.read(key: _keyBlynkRegion);
+
+  @override
+  Future<void> clearBlynkConfig() async {
+    await _storage.delete(key: _keyBlynkToken);
+    await _storage.delete(key: _keyBlynkRegion);
+  }
+
+  @override
   Future<void> clearAll() => _storage.deleteAll();
 }
 
@@ -145,6 +177,8 @@ class FakeSecureKeyStore implements SecureKeyStore {
   static const String _keyRefreshToken = 'auth_refresh_token';
   static const String _keyTokenExpiry = 'auth_token_expiry';
   static const String _keyBiometricsEnabled = 'setting_biometrics_enabled';
+  static const String _keyBlynkToken = 'blynk_auth_token';
+  static const String _keyBlynkRegion = 'blynk_region';
 
   String _homeKeyPrefix(String homeId) => 'home_key_$homeId';
   String _homeKeyIdPrefix(String homeId) => 'home_key_id_$homeId';
@@ -216,6 +250,27 @@ class FakeSecureKeyStore implements SecureKeyStore {
   @override
   Future<bool> isBiometricsEnabled() async {
     return _data[_keyBiometricsEnabled] == 'true';
+  }
+
+  @override
+  Future<void> saveBlynkConfig({
+    required String token,
+    required String region,
+  }) async {
+    _data[_keyBlynkToken] = token;
+    _data[_keyBlynkRegion] = region;
+  }
+
+  @override
+  Future<String?> getBlynkToken() async => _data[_keyBlynkToken];
+
+  @override
+  Future<String?> getBlynkRegion() async => _data[_keyBlynkRegion];
+
+  @override
+  Future<void> clearBlynkConfig() async {
+    _data.remove(_keyBlynkToken);
+    _data.remove(_keyBlynkRegion);
   }
 
   @override
