@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: smartswitch-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - HOST=0.0.0.0
+      - NODE_ENV=production
+      - DATABASE_PATH=/data/smartswitch.db
+      - MQTT_BROKER_URL=mqtt://mosquitto:1883
+      - MQTT_WS_URL=ws://mosquitto:9001
+      - RATE_LIMIT_LOGIN_MAX=100
+      - RATE_LIMIT_TOKEN_MAX=300
+      - RATE_LIMIT_WINDOW_MS=900000
+    volumes:
+      - backend-data:/data
+    depends_on:
+      - mosquitto
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    container_name: smartswitch-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"   # MQTT TCP
+      - "9001:9001"   # MQTT WebSocket
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - mosquitto-data:/mosquitto/data
+      - mosquitto-log:/mosquitto/log
+
+volumes:
+  backend-data:
+  mosquitto-data:
+  mosquitto-log:
