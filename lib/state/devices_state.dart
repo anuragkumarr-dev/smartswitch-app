@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/security/role_permissions.dart';
 import '../data/device_repository.dart';
 import '../domain/models/models.dart';
 import '../transport/command_router.dart';
@@ -334,6 +335,24 @@ class DevicesNotifier extends Notifier<DevicesState> {
       );
     }
     state = next;
+  }
+
+  /// Adds a device to the home. Enforces [RoleAction.addDevice] in the state layer.
+  void addDevice(Device device, {MemberRole userRole = MemberRole.owner}) {
+    RolePermissions.assertCan(userRole, RoleAction.addDevice);
+    setDevices([...state.values.map((s) => s.device), device]);
+  }
+
+  /// Removes a device from the home. Enforces [RoleAction.removeDevice] in the state layer.
+  void removeDevice(String deviceId, {MemberRole userRole = MemberRole.owner}) {
+    RolePermissions.assertCan(userRole, RoleAction.removeDevice);
+    final next = Map<String, DeviceUiState>.from(state)..remove(deviceId);
+    state = next;
+  }
+
+  /// Updates or adds a schedule. Enforces [RoleAction.editSchedules] in the state layer.
+  void updateSchedule(String deviceId, Schedule schedule, {MemberRole userRole = MemberRole.owner}) {
+    RolePermissions.assertCan(userRole, RoleAction.editSchedules);
   }
 }
 

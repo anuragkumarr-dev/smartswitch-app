@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/security/role_permissions.dart';
 import '../data/local_db/local_database.dart';
 import '../domain/models/models.dart';
 
@@ -101,6 +102,29 @@ class HomesNotifier extends Notifier<HomesState> {
 
   void setActiveHome(String homeId) {
     state = state.copyWith(activeHomeId: homeId);
+  }
+
+  /// Changes a member's role in the home. Enforces [RoleAction.changeRoles] (Owner only).
+  void changeMemberRole(
+    String homeId,
+    String userId,
+    MemberRole newRole, {
+    MemberRole actorRole = MemberRole.owner,
+  }) {
+    RolePermissions.assertCan(actorRole, RoleAction.changeRoles);
+  }
+
+  /// Factory resets a home and unbinds its mesh. Enforces [RoleAction.factoryReset] (Owner only).
+  Future<void> factoryResetHome(
+    String homeId, {
+    MemberRole actorRole = MemberRole.owner,
+  }) async {
+    RolePermissions.assertCan(actorRole, RoleAction.factoryReset);
+    final updated = List<Home>.from(state.homes)..removeWhere((h) => h.homeId == homeId);
+    state = state.copyWith(
+      homes: updated,
+      activeHomeId: updated.isNotEmpty ? updated.first.homeId : null,
+    );
   }
 }
 

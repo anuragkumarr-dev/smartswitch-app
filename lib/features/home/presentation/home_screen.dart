@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/security/role_permissions.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/skeleton_card.dart';
 import '../../../domain/models/models.dart';
+import '../../../state/auth_state.dart';
 import '../../../state/devices_state.dart';
 import '../../../state/homes_state.dart';
 import '../../../transport/command_router.dart';
@@ -32,6 +34,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final authState = ref.watch(authStateProvider);
     final homesState = ref.watch(homesStateProvider);
     final devicesMap = ref.watch(devicesStateProvider);
 
@@ -90,23 +93,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               );
                             },
                           ),
-                          Container(
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.accent,
+                          if (authState.can(RoleAction.addDevice))
+                            Container(
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: AppColors.accent,
+                              ),
+                              child: IconButton(
+                                icon: const Icon(Icons.add, color: Colors.white),
+                                tooltip: 'Add Switch',
+                                onPressed: () {
+                                  if (widget.onAddDevice != null) {
+                                    widget.onAddDevice!();
+                                  } else {
+                                    context.push('/onboarding');
+                                  }
+                                },
+                              ),
                             ),
-                            child: IconButton(
-                              icon: const Icon(Icons.add, color: Colors.white),
-                              tooltip: 'Add Switch',
-                              onPressed: () {
-                                if (widget.onAddDevice != null) {
-                                  widget.onAddDevice!();
-                                } else {
-                                  context.push('/onboarding');
-                                }
-                              },
-                            ),
-                          ),
                         ],
                       ),
                     ],
@@ -322,6 +326,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildEmptyState(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(Spacing.xl),
@@ -356,29 +361,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         : AppColors.lightOnSurfaceVariant,
                   ),
             ),
-            const SizedBox(height: Spacing.lg),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.lg,
-                  vertical: Spacing.md,
+            if (authState.can(RoleAction.addDevice)) ...[
+              const SizedBox(height: Spacing.lg),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.lg,
+                    vertical: Spacing.md,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(Radii.button),
+                  ),
                 ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(Radii.button),
-                ),
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                label: const Text('Add your first switch'),
+                onPressed: () {
+                  if (widget.onAddDevice != null) {
+                    widget.onAddDevice!();
+                  } else {
+                    context.push('/onboarding');
+                  }
+                },
               ),
-              icon: const Icon(Icons.qr_code_scanner_rounded),
-              label: const Text('Add your first switch'),
-              onPressed: () {
-                if (widget.onAddDevice != null) {
-                  widget.onAddDevice!();
-                } else {
-                  context.push('/onboarding');
-                }
-              },
-            ),
+            ],
           ],
         ),
       ),

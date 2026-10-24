@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../features/auth/presentation/login_screen.dart';
+import '../../features/auth/presentation/sign_up_screen.dart';
 import '../../features/device_control/presentation/device_control_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/mesh_diag/presentation/mesh_diag_screen.dart';
@@ -101,6 +103,20 @@ GoRouter createAppRouter({
         path: '/onboarding',
         parentNavigatorKey: navKey,
         builder: (context, state) => const OnboardingFlowScreen(),
+      ),
+
+      // Full-screen Route: Auth Login
+      GoRoute(
+        path: '/login',
+        parentNavigatorKey: navKey,
+        builder: (context, state) => const LoginScreen(),
+      ),
+
+      // Full-screen Route: Auth Sign-Up
+      GoRoute(
+        path: '/signup',
+        parentNavigatorKey: navKey,
+        builder: (context, state) => const SignUpScreen(),
       ),
     ],
   );

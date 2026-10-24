@@ -45,6 +45,9 @@ dependencies:
   path_provider: ^2.1.6
   sqlite3_flutter_libs: ^0.6.0+eol
   go_router: ^18.1.1
+  flutter_secure_storage: ^11.2.0
+  local_auth: ^3.0.2
+  dio: ^5.11.1
 
 dev_dependencies:
   flutter_test:
