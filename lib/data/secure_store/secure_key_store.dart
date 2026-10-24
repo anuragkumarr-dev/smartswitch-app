@@ -37,6 +37,10 @@ abstract interface class SecureKeyStore {
   Future<String?> getBlynkRegion();
   Future<void> clearBlynkConfig();
 
+  // App Mode (Demo vs Blynk)
+  Future<void> saveAppMode(String mode);
+  Future<String?> getAppMode();
+
   Future<void> clearAll();
 }
 
@@ -57,6 +61,7 @@ class FlutterSecureKeyStore implements SecureKeyStore {
   static const String _keyBiometricsEnabled = 'setting_biometrics_enabled';
   static const String _keyBlynkToken = 'blynk_auth_token';
   static const String _keyBlynkRegion = 'blynk_region';
+  static const String _keyAppMode = 'app_mode_setting';
 
   String _homeKeyPrefix(String homeId) => 'home_key_$homeId';
   String _homeKeyIdPrefix(String homeId) => 'home_key_id_$homeId';
@@ -166,6 +171,14 @@ class FlutterSecureKeyStore implements SecureKeyStore {
   }
 
   @override
+  Future<void> saveAppMode(String mode) async {
+    await _storage.write(key: _keyAppMode, value: mode);
+  }
+
+  @override
+  Future<String?> getAppMode() => _storage.read(key: _keyAppMode);
+
+  @override
   Future<void> clearAll() => _storage.deleteAll();
 }
 
@@ -179,6 +192,7 @@ class FakeSecureKeyStore implements SecureKeyStore {
   static const String _keyBiometricsEnabled = 'setting_biometrics_enabled';
   static const String _keyBlynkToken = 'blynk_auth_token';
   static const String _keyBlynkRegion = 'blynk_region';
+  static const String _keyAppMode = 'app_mode_setting';
 
   String _homeKeyPrefix(String homeId) => 'home_key_$homeId';
   String _homeKeyIdPrefix(String homeId) => 'home_key_id_$homeId';
@@ -272,6 +286,14 @@ class FakeSecureKeyStore implements SecureKeyStore {
     _data.remove(_keyBlynkToken);
     _data.remove(_keyBlynkRegion);
   }
+
+  @override
+  Future<void> saveAppMode(String mode) async {
+    _data[_keyAppMode] = mode;
+  }
+
+  @override
+  Future<String?> getAppMode() async => _data[_keyAppMode];
 
   @override
   Future<void> clearAll() async {

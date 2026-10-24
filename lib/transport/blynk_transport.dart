@@ -7,8 +7,54 @@ import 'models/blynk_node_map.dart';
 import 'models/message_envelope.dart';
 
 /// Callback signature when Blynk polling discovers or updates node mappings.
-typedef OnBlynkNodesUpdated = void Function(
+typedef OnBlynkNodesUpdated = Future<void> Function(
     BlynkNodeMap nodeMap, Map<int, int> rawPinStates);
+
+/// Callback signature when Blynk transport diagnostic status updates.
+typedef OnBlynkStatusChanged = void Function(BlynkStatus status);
+
+/// Immutable diagnostic status for the Blynk prototype bridge.
+@immutable
+class BlynkStatus {
+  final bool isConnected;
+  final int nodeCount;
+  final DateTime? lastPollTime;
+  final String? lastRawV16;
+  final String? lastCommandInfo;
+  final String? lastCommandResult;
+  final String? lastError;
+
+  const BlynkStatus({
+    this.isConnected = false,
+    this.nodeCount = 0,
+    this.lastPollTime,
+    this.lastRawV16,
+    this.lastCommandInfo,
+    this.lastCommandResult,
+    this.lastError,
+  });
+
+  BlynkStatus copyWith({
+    bool? isConnected,
+    int? nodeCount,
+    DateTime? lastPollTime,
+    String? lastRawV16,
+    String? lastCommandInfo,
+    String? lastCommandResult,
+    String? lastError,
+    bool clearError = false,
+  }) {
+    return BlynkStatus(
+      isConnected: isConnected ?? this.isConnected,
+      nodeCount: nodeCount ?? this.nodeCount,
+      lastPollTime: lastPollTime ?? this.lastPollTime,
+      lastRawV16: lastRawV16 ?? this.lastRawV16,
+      lastCommandInfo: lastCommandInfo ?? this.lastCommandInfo,
+      lastCommandResult: lastCommandResult ?? this.lastCommandResult,
+      lastError: clearError ? null : (lastError ?? this.lastError),
+    );
+  }
+}
 
 /// Prototype [CloudTransport] bridge to connect ESP-NOW + Blynk firmware.
 /// Interacts with the Blynk REST API: https://{region}.blynk.cloud/external/api
@@ -22,6 +68,7 @@ class BlynkCloudTransport implements CloudTransport {
   String region;
 
   bool _isConnected = false;
+  bool _stopped = true;
   Timer? _pollerTimer;
 
   // Polling rate: 1.5 seconds default
@@ -35,7 +82,16 @@ class BlynkCloudTransport implements CloudTransport {
   BlynkNodeMap _currentNodeMap =
       const BlynkNodeMap(masterMac: '', nodesByMac: {}, macByPin: {});
 
-  // Cached reported states by pin: pinNumber -> 0 or 1
+  // Debug Diagnostics Information
+  DateTime? lastPollTime;
+  String? lastRawV16;
+  String? lastCommandInfo;
+  String? lastCommandResult;
+  String? lastError;
+
+  BlynkStatus status = const BlynkStatus();
+  OnBlynkStatusChanged? onStatusChanged;
+
   final Map<int, int> _pinStates = {}; // pinNumber -> 0 or 1
   int _localVer = 1000;
 
@@ -44,6 +100,7 @@ class BlynkCloudTransport implements CloudTransport {
 
   OnBlynkNodesUpdated? onNodesUpdated;
 
+  /// Optional base URL override for unit testing with local loopback mock servers.
   final String? customBaseUrl;
 
   BlynkCloudTransport({
@@ -71,9 +128,45 @@ class BlynkCloudTransport implements CloudTransport {
 
   String get baseUrl => customBaseUrl ?? 'https://$region.blynk.cloud/external/api';
 
+  void _updateStatus({
+    bool? isConnected,
+    int? nodeCount,
+    DateTime? lastPollTime,
+    String? lastRawV16,
+    String? lastCommandInfo,
+    String? lastCommandResult,
+    String? lastError,
+    bool clearError = false,
+  }) {
+    if (isConnected != null) _isConnected = isConnected;
+    if (lastPollTime != null) this.lastPollTime = lastPollTime;
+    if (lastRawV16 != null) this.lastRawV16 = lastRawV16;
+    if (lastCommandInfo != null) this.lastCommandInfo = lastCommandInfo;
+    if (lastCommandResult != null) this.lastCommandResult = lastCommandResult;
+    if (clearError) {
+      this.lastError = null;
+    } else if (lastError != null) {
+      this.lastError = lastError;
+    }
+
+    status = status.copyWith(
+      isConnected: isConnected,
+      nodeCount: nodeCount,
+      lastPollTime: lastPollTime,
+      lastRawV16: lastRawV16,
+      lastCommandInfo: lastCommandInfo,
+      lastCommandResult: lastCommandResult,
+      lastError: lastError,
+      clearError: clearError,
+    );
+
+    onStatusChanged?.call(status);
+  }
+
   void updateCredentials({required String token, String region = 'blr1'}) {
     authToken = token;
     this.region = region;
+    _updateStatus(clearError: true);
   }
 
   @override
@@ -85,23 +178,34 @@ class BlynkCloudTransport implements CloudTransport {
   }) async {
     if (authToken.trim().isEmpty) {
       _isConnected = false;
+      _updateStatus(isConnected: false, lastError: 'No Blynk Auth Token provided');
       return false;
     }
 
     // Verify hardware is connected
     final isOnline = await checkHardwareConnected();
     _isConnected = isOnline;
+    _updateStatus(
+      isConnected: isOnline,
+      lastError: isOnline ? null : 'Hardware offline',
+      clearError: isOnline,
+    );
 
     _startPolling();
     return _isConnected;
   }
 
   /// Checks https://{region}.blynk.cloud/external/api/isHardwareConnected?token={token}
-  Future<bool> checkHardwareConnected() async {
+  Future<bool> checkHardwareConnected({String? token, String? region}) async {
+    final useToken = token ?? authToken;
+    final useRegion = region ?? this.region;
+    if (useToken.trim().isEmpty) return false;
+
     try {
+      final host = customBaseUrl ?? 'https://$useRegion.blynk.cloud/external/api';
       final res = await dio.get<dynamic>(
-        '$baseUrl/isHardwareConnected',
-        queryParameters: {'token': authToken},
+        '$host/isHardwareConnected',
+        queryParameters: {'token': useToken},
       );
       if (res.statusCode == 200) {
         final val = res.data.toString().toLowerCase();
@@ -142,6 +246,10 @@ class BlynkCloudTransport implements CloudTransport {
     }
 
     final int targetVal = targetOn ? 1 : 0;
+    final cmdInfo =
+        'SET $mac (V$pin) -> $targetVal (${targetOn ? "ON" : "OFF"}) at ${DateTime.now().toIso8601String().substring(11, 19)}';
+    _updateStatus(lastCommandInfo: cmdInfo);
+
     final stopwatch = Stopwatch()..start();
 
     try {
@@ -155,6 +263,7 @@ class BlynkCloudTransport implements CloudTransport {
       ).timeout(timeout);
 
       if (updateRes.statusCode != 200) {
+        _updateStatus(lastCommandResult: 'HTTP Error: ${updateRes.statusCode}');
         return null;
       }
 
@@ -176,6 +285,10 @@ class BlynkCloudTransport implements CloudTransport {
           if (currentVal == targetVal) {
             // Confirmed!
             _localVer++;
+            _updateStatus(
+              lastCommandResult:
+                  'Confirmed (${stopwatch.elapsedMilliseconds} ms)',
+            );
             final ackEnvelope = MessageEnvelope.ack(
               deviceId: mac,
               commandId: envelope.commandId,
@@ -193,8 +306,13 @@ class BlynkCloudTransport implements CloudTransport {
       }
 
       // Timeout or mismatch -> null indicates rollback
+      _updateStatus(
+        lastCommandResult:
+            'Mismatch / Timeout (${stopwatch.elapsedMilliseconds} ms) -> Rolled back',
+      );
       return null;
     } catch (e) {
+      _updateStatus(lastCommandResult: 'Exception: $e');
       debugPrint('[BlynkBridge] Command failed: $e');
       return null;
     } finally {
@@ -210,20 +328,26 @@ class BlynkCloudTransport implements CloudTransport {
 
   @override
   Future<void> disconnect() async {
+    _stopped = true;
     _pollerTimer?.cancel();
     _pollerTimer = null;
     _isConnected = false;
+    _updateStatus(isConnected: false);
   }
 
   void _startPolling() {
+    _stopped = false;
     _pollerTimer?.cancel();
     _scheduleNextPoll(Duration.zero);
   }
 
   void _scheduleNextPoll(Duration delay) {
+    if (_stopped) return;
     _pollerTimer?.cancel();
     _pollerTimer = Timer(delay, () async {
+      if (_stopped) return;
       await _pollOnce();
+      if (_stopped) return;
       if (_isConnected) {
         _consecutiveFailures = 0;
         _scheduleNextPoll(pollingInterval);
@@ -235,6 +359,11 @@ class BlynkCloudTransport implements CloudTransport {
         _scheduleNextPoll(Duration(seconds: backoffSec));
       }
     });
+  }
+
+  /// Triggers an immediate poll cycle.
+  Future<void> pollNow() async {
+    await _pollOnce();
   }
 
   /// Reads V0..V16 in batch via /get endpoint.
@@ -255,19 +384,42 @@ class BlynkCloudTransport implements CloudTransport {
 
       if (res.statusCode == 200) {
         _isConnected = true;
-        _parseBatchResponse(res.data);
+        _updateStatus(
+          isConnected: true,
+          lastPollTime: DateTime.now(),
+          clearError: true,
+        );
+        await _parseBatchResponse(res.data);
       } else {
         _isConnected = false;
+        _updateStatus(
+          isConnected: false,
+          lastError: 'HTTP ${res.statusCode} from Blynk Cloud',
+        );
       }
+    } on DioException catch (e) {
+      _isConnected = false;
+      final code = e.response?.statusCode;
+      final msg = code != null
+          ? 'Blynk Cloud Error ($code): ${code == 401 ? "Invalid Auth Token" : e.message}'
+          : (e.message ?? 'Network Error');
+      _updateStatus(
+        isConnected: false,
+        lastError: msg,
+      );
     } catch (e) {
       _isConnected = false;
+      _updateStatus(
+        isConnected: false,
+        lastError: e.toString(),
+      );
     }
   }
 
   /// Parses the Blynk batch response.
   /// Depending on Blynk server version, response can be JSON object {"V0":"0","V1":"1",..."V16":"..."}
   /// or a JSON array of strings / values.
-  void _parseBatchResponse(dynamic data) {
+  Future<void> _parseBatchResponse(dynamic data) async {
     String v16String = '';
     final newPinStates = <int, int>{};
 
@@ -294,7 +446,11 @@ class BlynkCloudTransport implements CloudTransport {
     if (v16String.isNotEmpty) {
       final parsedMap = BlynkNodeMap.parse(v16String);
       _currentNodeMap = parsedMap;
-      onNodesUpdated?.call(parsedMap, _pinStates);
+      _updateStatus(
+        lastRawV16: v16String,
+        nodeCount: parsedMap.nodesByMac.length,
+      );
+      await onNodesUpdated?.call(parsedMap, _pinStates);
 
       // Emit MessageEnvelope.state for each node in map
       for (final entry in parsedMap.nodesByMac.values) {
@@ -321,6 +477,17 @@ class BlynkCloudTransport implements CloudTransport {
           _incomingController.add(envelope);
         }
       }
+    } else {
+      _updateStatus(lastRawV16: '');
+    }
+  }
+
+  void dispose() {
+    _stopped = true;
+    _pollerTimer?.cancel();
+    _pollerTimer = null;
+    if (!_incomingController.isClosed) {
+      _incomingController.close();
     }
   }
 }

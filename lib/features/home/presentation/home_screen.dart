@@ -5,9 +5,12 @@ import '../../../core/security/role_permissions.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/skeleton_card.dart';
 import '../../../domain/models/models.dart';
+import '../../../state/active_transport_provider.dart';
+import '../../../state/app_mode_state.dart';
 import '../../../state/auth_state.dart';
 import '../../../state/devices_state.dart';
 import '../../../state/homes_state.dart';
+import '../../../transport/blynk_bridge_controller.dart';
 import '../../../transport/command_router.dart';
 import '../widgets/device_card.dart';
 
@@ -122,6 +125,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               SliverToBoxAdapter(
                 child: Column(
                   children: [
+                    // Mode banner: Blynk real switch status or error banner
+                    _buildModeBanner(context, ref),
+
                     SizedBox(
                       height: 48,
                       child: ListView.separated(
@@ -403,22 +409,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final primaryGang = dev.gangs.isNotEmpty ? dev.gangs.first : null;
     final gangId = primaryGang?.gangId ?? 'gang1';
 
-    if (widget.commandRouter != null) {
-      ref.read(devicesStateProvider.notifier).toggleGang(
-            deviceId: dev.deviceId,
-            gangId: gangId,
-            router: widget.commandRouter!,
-          );
-    } else {
-      // Toggle optimistic state directly when running UI preview / tests
-      final current = uiState.effectiveGangIsOn(gangId);
-      ref.read(devicesStateProvider.notifier).markPending(
-            deviceId: dev.deviceId,
-            gangId: gangId,
-            desired: !current,
-            commandId: 'cmd_${DateTime.now().millisecondsSinceEpoch}',
-          );
-    }
+    final CommandRouter router = widget.commandRouter ?? ref.read(commandRouterProvider);
+
+    ref.read(devicesStateProvider.notifier).toggleGang(
+          deviceId: dev.deviceId,
+          gangId: gangId,
+          router: router,
+        );
   }
 
   void _turnAllOff(List<DeviceUiState> devices) {
@@ -546,6 +543,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildModeBanner(BuildContext context, WidgetRef ref) {
+    final mode = ref.watch(appModeProvider);
+    if (mode.isDemo) return const SizedBox.shrink();
+
+    final blynkStatus = ref.watch(blynkStatusProvider);
+    final isConnected = blynkStatus.isConnected;
+    final nodeCount = blynkStatus.nodeCount;
+    final lastError = blynkStatus.lastError;
+
+    final Color bannerColor = isConnected ? AppColors.success : AppColors.error;
+    final String message = isConnected
+        ? 'Connected to Blynk, $nodeCount switch${nodeCount == 1 ? "" : "es"}'
+        : (lastError ?? 'Blynk hardware is offline or connecting...');
+
+    return Padding(
+      padding: const EdgeInsets.only(
+        left: Spacing.screenMargin,
+        right: Spacing.screenMargin,
+        bottom: Spacing.sm,
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: bannerColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(Radii.button),
+          border: Border.all(color: bannerColor),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isConnected ? Icons.cloud_done_rounded : Icons.cloud_off_rounded,
+              size: 18,
+              color: bannerColor,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: bannerColor,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            InkWell(
+              onTap: () => context.push('/settings'),
+              child: Text(
+                'Settings',
+                style: TextStyle(
+                  color: bannerColor,
+                  fontWeight: FontWeight.bold,
+                  decoration: TextDecoration.underline,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

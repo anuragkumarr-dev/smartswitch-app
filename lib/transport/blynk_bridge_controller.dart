@@ -1,22 +1,75 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/local_db/in_memory_local_database.dart';
 import '../data/local_db/local_database.dart';
 import '../data/secure_store/secure_key_store.dart';
 import '../domain/models/models.dart';
+import '../state/auth_state.dart';
 import '../state/devices_state.dart';
+import '../state/homes_state.dart';
 import '../state/mesh_topology_state.dart';
 import 'blynk_transport.dart';
 import 'models/blynk_node_map.dart';
 import 'models/message_envelope.dart';
 
+/// Default local database provider (in-memory for demo / tests, drift in prod).
+final appLocalDatabaseProvider = Provider<AppLocalDatabase>((ref) {
+  return InMemoryLocalDatabase();
+});
+
 /// Provider for the Blynk prototype configuration and transport bridge.
 final blynkTransportProvider = Provider<BlynkCloudTransport>((ref) {
   final transport = BlynkCloudTransport(authToken: '');
   ref.onDispose(() {
-    transport.disconnect();
+    transport.dispose();
   });
   return transport;
+});
+
+/// Notifier managing reactive diagnostics status for Blynk transport.
+class BlynkStatusNotifier extends Notifier<BlynkStatus> {
+  @override
+  BlynkStatus build() {
+    return const BlynkStatus();
+  }
+
+  void update(BlynkStatus newStatus) {
+    state = newStatus;
+  }
+}
+
+final blynkStatusProvider =
+    NotifierProvider<BlynkStatusNotifier, BlynkStatus>(BlynkStatusNotifier.new);
+
+/// Provider for the active [BlynkBridgeController].
+final blynkBridgeControllerProvider = Provider<BlynkBridgeController>((ref) {
+  final transport = ref.watch(blynkTransportProvider);
+  final storage = ref.watch(secureKeyStoreProvider);
+  final localDb = ref.watch(appLocalDatabaseProvider);
+  final devicesNotifier = ref.watch(devicesStateProvider.notifier);
+  final meshNotifier = ref.watch(meshTopologyStateProvider.notifier);
+  final activeHomeId = ref.watch(homesStateProvider).activeHomeId ?? 'h_main';
+
+  transport.onStatusChanged = (status) {
+    ref.read(blynkStatusProvider.notifier).update(status);
+  };
+
+  final controller = BlynkBridgeController(
+    transport: transport,
+    secureStorage: storage,
+    localDatabase: localDb,
+    devicesNotifier: devicesNotifier,
+    meshNotifier: meshNotifier,
+    homeId: activeHomeId,
+  );
+
+  ref.onDispose(() {
+    transport.onStatusChanged = null;
+    controller.dispose();
+  });
+
+  return controller;
 });
 
 /// Bridge controller synchronizing Blynk V16 node map with:
@@ -31,6 +84,7 @@ class BlynkBridgeController {
   final MeshTopologyNotifier meshNotifier;
   final String homeId;
 
+  bool _disposed = false;
   StreamSubscription? _msgSub;
 
   BlynkBridgeController({
@@ -46,6 +100,7 @@ class BlynkBridgeController {
   }
 
   void dispose() {
+    _disposed = true;
     _msgSub?.cancel();
     transport.disconnect();
   }
@@ -54,6 +109,12 @@ class BlynkBridgeController {
   Future<bool> initialize() async {
     final token = await secureStorage.getBlynkToken();
     final region = (await secureStorage.getBlynkRegion()) ?? 'blr1';
+
+    // Check cached devices in Drift DB first to avoid empty screen
+    final cached = await localDatabase.getDevices(homeId);
+    if (!_disposed && cached.isNotEmpty) {
+      devicesNotifier.setDevices(cached);
+    }
 
     if (token != null && token.isNotEmpty) {
       transport.updateCredentials(token: token, region: region);
@@ -77,6 +138,7 @@ class BlynkBridgeController {
 
   /// Handles incoming MessageEnvelope.state emissions from poller.
   void _handleIncomingMessage(MessageEnvelope envelope) {
+    if (_disposed) return;
     if (envelope.type == 'state' && envelope.reported != null) {
       devicesNotifier.applyLiveDelta(
         deviceId: envelope.deviceId,
@@ -90,7 +152,7 @@ class BlynkBridgeController {
   /// Reconciles nodes with Drift database by MAC and updates UI notifiers.
   Future<void> _handleNodesUpdated(
       BlynkNodeMap nodeMap, Map<int, int> rawPinStates) async {
-    if (nodeMap.nodesByMac.isEmpty) return;
+    if (_disposed || nodeMap.nodesByMac.isEmpty) return;
 
     // Load existing cached devices from Drift DB to preserve custom user names & rooms
     final cachedDevices = await localDatabase.getDevices(homeId);

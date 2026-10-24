@@ -7,15 +7,25 @@ import 'core/theme.dart';
 import 'domain/models/models.dart';
 import 'features/onboarding/presentation/debug_provisioning_screen.dart';
 import 'features/onboarding/presentation/qr_scan_screen.dart';
+import 'state/auth_state.dart';
 import 'state/devices_state.dart';
 import 'state/homes_state.dart';
 import 'state/mesh_topology_state.dart';
+import 'transport/blynk_bridge_controller.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   final container = ProviderContainer();
-  _seedInitialState(container);
+  final storage = container.read(secureKeyStoreProvider);
+  final savedMode = await storage.getAppMode();
+  final token = await storage.getBlynkToken();
+
+  if (savedMode == 'blynk' || (savedMode == null && token != null && token.isNotEmpty)) {
+    await container.read(blynkBridgeControllerProvider).initialize();
+  } else {
+    _seedInitialState(container);
+  }
 
   runApp(
     UncontrolledProviderScope(

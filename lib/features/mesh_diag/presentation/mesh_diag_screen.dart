@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme.dart';
 import '../../../core/widgets/status_chip.dart';
 import '../../../domain/models/models.dart';
+import '../../../state/app_mode_state.dart';
 import '../../../state/mesh_topology_state.dart';
+import '../../../transport/blynk_bridge_controller.dart';
 import '../widgets/topology_view.dart';
 
 /// Production Mesh Diagnostics screen conforming to Blueprint §4.4.
@@ -28,11 +30,14 @@ class _MeshDiagScreenState extends ConsumerState<MeshDiagScreen> {
   void initState() {
     super.initState();
     _startAutoRefresh();
-    // Seed initial topology if empty
+    // Seed initial topology if empty and in Demo mode
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final current = ref.read(meshTopologyStateProvider);
-      if (current.nodes.isEmpty) {
-        _seedMockTopology();
+      final mode = ref.read(appModeProvider);
+      if (mode.isDemo) {
+        final current = ref.read(meshTopologyStateProvider);
+        if (current.nodes.isEmpty) {
+          _seedMockTopology();
+        }
       }
     });
   }
@@ -53,6 +58,12 @@ class _MeshDiagScreenState extends ConsumerState<MeshDiagScreen> {
   }
 
   void _refreshTopology() {
+    final mode = ref.read(appModeProvider);
+    if (mode.isBlynk) {
+      ref.read(blynkTransportProvider).pollNow();
+      return;
+    }
+
     ref.read(meshTopologyStateProvider.notifier).setRefreshing(true);
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {

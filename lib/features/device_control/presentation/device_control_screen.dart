@@ -5,6 +5,7 @@ import '../../../core/theme.dart';
 import '../../../core/widgets/rssi_bar.dart';
 import '../../../core/widgets/status_chip.dart';
 import '../../../domain/models/models.dart';
+import '../../../state/active_transport_provider.dart';
 import '../../../state/devices_state.dart';
 import '../../../transport/command_router.dart';
 import '../widgets/power_button.dart';
@@ -820,19 +821,11 @@ class _DeviceControlScreenState extends ConsumerState<DeviceControlScreen>
   }
 
   void _handleToggleGang(String gangId, bool currentIsOn) {
-    if (widget.commandRouter != null) {
-      ref.read(devicesStateProvider.notifier).toggleGang(
-            deviceId: widget.deviceId,
-            gangId: gangId,
-            router: widget.commandRouter!,
-          );
-    } else {
-      ref.read(devicesStateProvider.notifier).markPending(
-            deviceId: widget.deviceId,
-            gangId: gangId,
-            desired: !currentIsOn,
-            commandId: 'cmd_${DateTime.now().millisecondsSinceEpoch}',
-          );
-    }
+    final CommandRouter router = widget.commandRouter ?? ref.read(commandRouterProvider);
+    ref.read(devicesStateProvider.notifier).toggleGang(
+          deviceId: widget.deviceId,
+          gangId: gangId,
+          router: router,
+        );
   }
 }
