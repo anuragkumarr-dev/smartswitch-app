@@ -31,8 +31,10 @@ lib/
 | 1. BLE provisioning engine | QR scan, BLE session, config push, status stream | ✅ Done |
 | 2. Local & cloud comms | mDNS, WebSocket, MQTT, CommandRouter | ✅ Done |
 | 3. State & models | Domain models, Riverpod providers, local DB, shadow sync | ✅ Done |
-| 4. Production UI | Home, control, schedules, mesh diagnostics, onboarding | ⬜ Not started |
-| 5. Security, auth, cloud sync | Login, roles, tokens, ACLs, OTA, push | ⬜ Not started |
+| 4. Production UI | Home, control, schedules, mesh diagnostics, onboarding | ✅ Done |
+| 5A. Client security & auth | Login, roles, tokens, secure storage, cert pinning | ✅ Done |
+| 5B. Reference backend | Express/TS, activation tokens, device registry, Mosquitto | ✅ Done |
+| Prototype: Blynk Bridge | Dynamic V16 node map, real ESP-NOW hardware control | ✅ Done |
 
 ## Rules for AI Agents
 
