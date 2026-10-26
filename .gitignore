@@ -53,7 +53,7 @@ GoogleService-Info.plist
 
 # Flutter plugin registration (auto-generated)
 .flutter-plugins
-.kotlin/
+**/.kotlin/
 devtools_options.yaml
 
 # Node.js / Backend
